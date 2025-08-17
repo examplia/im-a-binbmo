@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TC2 JobId → Join Link</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="color-scheme" content="dark light" />
+</head>
+<body class="min-h-screen bg-neutral-950 text-neutral-100">
+  <main class="mx-auto max-w-2xl p-6">
+    <header class="mb-8">
+      <h1 class="text-3xl font-semibold tracking-tight">TC2 JobId → Join Link</h1>
+      <p class="text-neutral-400 mt-2">Convert a Roblox <code class="px-1 rounded bg-neutral-800">JobId</code> to a join link for
+        <a class="underline decoration-neutral-600 hover:decoration-neutral-300"
+           href="https://www.roblox.com/games/328028363/Typical-Colors-2-UNVAULTED" target="_blank" rel="noreferrer">
+          Typical Colors 2
+        </a>.
+      </p>
+    </header>
+
+    <section class="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5 shadow-lg">
+      <label for="jobId" class="block text-sm text-neutral-300 mb-2">Paste a JobId or a Roblox server URL</label>
+      <div class="flex gap-2">
+        <input id="jobId" type="text" placeholder="e.g. 7e1a2b3c-45d6-7890-ab12-3456789cdef0"
+               class="w-full rounded-xl border border-neutral-700 bg-neutral-950 px-4 py-3 outline-none ring-0 focus:border-neutral-500"
+               autocomplete="off" />
+        <button id="makeBtn"
+                class="shrink-0 rounded-xl bg-white/90 px-4 py-3 text-black font-medium hover:bg-white transition">
+          Make links
+        </button>
+      </div>
+
+      <p id="hint" class="text-xs text-neutral-400 mt-2">Tip: You can paste a whole URL (it will auto-extract the JobId).</p>
+
+      <div id="error" class="hidden mt-3 rounded-lg border border-red-800/60 bg-red-950/50 px-3 py-2 text-sm text-red-200"></div>
+
+      <div id="results" class="hidden mt-6 space-y-4">
+        <div class="grid gap-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-neutral-300">Deep link (best):</h2>
+            <div class="flex gap-2">
+              <button data-copy="proto" class="copy-btn text-xs rounded-lg border border-neutral-700 px-2 py-1 hover:bg-neutral-800">Copy</button>
+              <a id="openProto" class="text-xs rounded-lg bg-white/90 px-2 py-1 text-black font-semibold hover:bg-white" target="_self">Open</a>
+            </div>
+          </div>
+          <code id="protoLink" class="block break-all rounded-xl bg-neutral-950 p-3 text-xs"></code>
+        </div>
+
+        <div class="grid gap-3">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-semibold text-neutral-300">Browser fallback:</h2>
+            <div class="flex gap-2">
+              <button data-copy="web" class="copy-btn text-xs rounded-lg border border-neutral-700 px-2 py-1 hover:bg-neutral-800">Copy</button>
+              <a id="openWeb" class="text-xs rounded-lg bg-white/90 px-2 py-1 text-black font-semibold hover:bg-white" target="_blank" rel="noreferrer">Open</a>
+            </div>
+          </div>
+          <code id="webLink" class="block break-all rounded-xl bg-neutral-950 p-3 text-xs"></code>
+        </div>
+
+        <div class="rounded-xl border border-neutral-800 bg-neutral-900/60 p-4">
+          <h3 class="font-semibold text-sm mb-1">Notes</h3>
+          <ul class="list-disc pl-5 text-xs text-neutral-400 space-y-1">
+            <li>Deep link launches the Roblox app directly when supported.</li>
+            <li>The browser fallback may not auto-launch on all platforms without the app protocol; behavior varies by OS/browser.</li>
+            <li>Server must be joinable (e.g., public or you have access).</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <footer class="mt-8 text-xs text-neutral-500">
+      Made for placeId <span class="font-mono">328028363</span>. No tracking, all client-side.
+    </footer>
+  </main>
+
+  <script>
+    const PLACE_ID = 328028363;
+
+    const $ = (id) => document.getElementById(id);
+    const jobIdInput = $("jobId");
+    const btn = $("makeBtn");
+    const errorBox = $("error");
+    const results = $("results");
+    const protoLinkEl = $("protoLink");
+    const webLinkEl = $("webLink");
+    const openProto = $("openProto");
+    const openWeb = $("openWeb");
+
+    // Try to extract JobId from full URLs or text blobs
+    function extractJobId(s) {
+      if (!s) return null;
+      const str = String(s).trim();
+
+      // Common params: gameInstanceId=... or gameId=... or serverJobId=...
+      const paramMatch = str.match(/[?&#](?:gameInstanceId|gameId|serverJobId)=([0-9a-fA-F-]{36})/);
+      if (paramMatch) return paramMatch[1];
+
+      // Raw GUID?
+      const guidMatch = str.match(/\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/);
+      if (guidMatch) return guidMatch[0];
+
+      return null;
+    }
+
+    function buildLinks(jobId) {
+      // Current deep link (works best on desktop with Roblox app installed)
+      const proto = `roblox://experiences/start?placeId=${PLACE_ID}&gameInstanceId=${encodeURIComponent(jobId)}`;
+
+      // Browser fallback (behavior can vary by platform)
+      const web = `https://www.roblox.com/games/start?placeId=${PLACE_ID}&gameInstanceId=${encodeURIComponent(jobId)}`;
+
+      return { proto, web };
+    }
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.classList.remove("hidden");
+      results.classList.add("hidden");
+    }
+
+    function clearError() {
+      errorBox.classList.add("hidden");
+      errorBox.textContent = "";
+    }
+
+    function handleMake() {
+      clearError();
+      const parsed = extractJobId(jobIdInput.value);
+
+      if (!parsed) {
+        showError("Couldn’t find a valid JobId. Paste a 36-char GUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) or a Roblox URL that contains it.");
+        return;
+      }
+
+      const { proto, web } = buildLinks(parsed);
+      protoLinkEl.textContent = proto;
+      webLinkEl.textContent = web;
+
+      openProto.href = proto;
+      openWeb.href = web;
+
+      results.classList.remove("hidden");
+    }
+
+    btn.addEventListener("click", handleMake);
+    jobIdInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleMake();
+    });
+
+    // Copy buttons
+    document.querySelectorAll(".copy-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const which = btn.getAttribute("data-copy");
+        const text = which === "proto" ? protoLinkEl.textContent : webLinkEl.textContent;
+        try {
+          await navigator.clipboard.writeText(text);
+          const prev = btn.textContent;
+          btn.textContent = "Copied!";
+          setTimeout(() => (btn.textContent = prev), 1000);
+        } catch {
+          alert("Clipboard failed. Manually copy the link.");
+        }
+      });
+    });
+  </script>
+</body>
+</html>
